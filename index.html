@@ -103,6 +103,8 @@ table.pts td{padding:4px 8px;text-align:right;border-top:1px solid var(--line);f
 table.pts tr.me td{background:var(--warm-soft);font-weight:500}
 table.pts td.z{color:var(--ink-3)}
 table.pts .grp{border-left:1px solid var(--line)}
+table.pts td.md{color:var(--accent);font-weight:500}
+.dinner p.note sup{font-size:.75em;line-height:0}
 dl.facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:5px 14px;margin:0;font-size:13.5px}
 dl.facts dt{color:var(--ink-3)}
 dl.facts dd{margin:0;font-variant-numeric:tabular-nums}
@@ -182,12 +184,13 @@ footer ul{margin:6px 0 0;padding-left:18px}
     <div class="cols">
       <div>
         <p><b>Applied and drew.</b> Applied is everyone in your residency group who listed the hunt first or second, with the split underneath. Drew is the tags that group received, split into tags drawn on a first choice and tags drawn on a second choice. The split covers both the bonus pass and the random pass.</p>
-        <p><b>Odds.</b> Tags drawn divided by everyone in your residency group who listed the hunt as a first or second choice. Arizona considers both choices on every application, so this is the fair pool. Listing a hunt first does a little better than this number; the detail view also shows the first-choice-only ceiling.</p>
-        <p><b>Odds at my points.</b> The same calculation, limited to applicants who went in with exactly your number of bonus points. Small groups swing a lot from year to year, so the count is shown under the percentage.</p>
+        <p><b>Odds.</b> Tags drawn divided by everyone in your residency group who listed the hunt as a first or second choice. Arizona considers both choices on every application, so this is the fair pool. Listing a hunt first does better than this number, and that is what the odds at my points assume. The detail view also shows the first-choice-only ceiling.</p>
+        <p><b>Odds at my points.</b> A model of the 2026 draw for one applicant who lists the hunt first with your points. It is not a count of the people who happened to apply at that level. Above the lowest point level that drew a bonus-pass tag, the tag was certain. Below it, the chance comes from the random pass, where each bonus point adds a random number: 1 − (1 − p)<sup>points + 1</sup>. The per-number chance p is set for each hunt so the model hands first-choice applicants the tags they actually drew. Bull hunts are modeled separately for residents and nonresidents because of the cap. A hunt with tags left over after the pass shows as certain. The result never falls as points rise.</p>
+        <p><b>Actual, under the percentage.</b> What happened in 2026 to the applicants at exactly your level, first and second choices together. Small groups bounce around, and second-choice applicants draw less often, so it will not match the model. Both describe 2026 only. Cutoffs move every year with tag numbers and applicants.</p>
       </div>
       <div>
-        <p><b>All drew at.</b> The lowest point level where every applicant at that level and above drew. A dash means even the top point holders were not all drawn.</p>
-        <p><b>How the draw runs.</b> About 20% of each hunt's tags go first to the highest point holders (the bonus pass). The rest are drawn at random, with one extra random number per bonus point. Nonresidents are capped at about 10% of the tags in each bull hunt. <span id="nrline"></span> Antlerless and any-elk hunts are not held to that; several went above 10% in 2026.</p>
+        <p><b>All drew at.</b> The lowest point level where every applicant at that level and above drew. A dash means even the top point holders were not all drawn. It can sit above the bonus-pass cutoff, because an applicant who listed the hunt second and drew a first choice counts as not drawing here.</p>
+        <p><b>How the draw runs.</b> About 20% of each hunt's tags go first to the highest point holders (the bonus pass). The rest are drawn at random, with one extra random number per bonus point. Nonresidents are capped at about 10% of the tags in each bull hunt, and no more than half of those can come from the bonus pass. <span id="nrline"></span> Antlerless and any-elk hunts are not held to that; several went above 10% in 2026.</p>
       </div>
       <div>
         <p><b>2025 success.</b> Share of hunters who took an elk in the matching 2025 hunt, from the department's hunter survey. Hunts are matched by unit, weapon, elk type and season dates, since hunt numbers change between years. Six 2026 hunts have no 2025 match.</p>
@@ -198,7 +201,7 @@ footer ul{margin:6px 0 0;padding-left:18px}
   </details>
 
   <footer>
-    Built from documents Arizona Game &amp; Fish publishes for free. Nothing here is estimated beyond the division described above.
+    Built from documents Arizona Game &amp; Fish publishes for free. The odds at your points are a model, described above. Every other number is a published count or a simple division.
     <ul>
       <li><a href="https://www.azgfd.com/wp-content/uploads/2026/03/2026-M-Bonus-Point-Report.pdf" target="_blank" rel="noopener">2026 Pronghorn &amp; Elk Bonus Point Report</a>: applicants and permits by bonus point, residency and hunt number</li>
       <li><a href="https://www.azgfd.com/wp-content/uploads/2026/03/2026-M-Draw-Report-1-2-Pass.pdf" target="_blank" rel="noopener">2026 Draw Report, 1-2 Pass</a>: tags drawn on first versus second choice, by hunt and residency</li>
@@ -257,11 +260,40 @@ function st(h,k){
   const r=k==='r';
   return h['_'+k]={d1:h.x[r?0:2]+h.t[r?4:6]-h.x[r?4:5],d2:h.x[r?1:3]+h.x[r?4:5],sa,sp,top,minD,sure,first:h.t[r?0:1],second:h.t[r?2:3],bonus:h.t[r?4:6],bmin:h.t[r?5:7],odds:sa?sp/sa:null,ceil:h.t[r?0:1]?Math.min(1,sp/h.t[r?0:1]):null};
 }
+/* Draw model: the odds for one applicant who lists the hunt first with b bonus points, from how the 2026 draw ran.
+   Bonus pass: every point level above the lowest one that drew a bonus-pass tag is certain; that lowest level is split by its own share.
+   Random pass: an application keeps the best of (points + 1) random numbers, so the chance is 1-(1-c)^(points+1). c is the chance per
+   random number that hands first-choice applicants the tags they actually drew, and never less than the rate for the whole pool.
+   Bull hunts are modeled per residency, because the 10% nonresident cap filled on every one. Other hunts have no cap, so both groups share one line. */
+function mdl(h,k){
+  const capped=h.l==='B',key='$'+(capped?k:'a');
+  if(h[key]) return h[key];
+  const ks=capped?[k]:['r','n'],len=Math.max(...ks.map(g=>h[g+'a'].length));
+  const A=new Array(len).fill(0),P=new Array(len).fill(0);
+  let B=0,B2=0,cut=len,F=0,d1=0,d2=0;
+  for(const g of ks){
+    const r=g==='r',b=h.t[r?4:6]||0;
+    h[g+'a'].forEach((v,i)=>{ A[i]+=v||0; }); h[g+'p'].forEach((v,i)=>{ P[i]+=v||0; });
+    if(b){ B+=b; B2+=h.x[r?4:5]||0; cut=Math.min(cut,h.t[r?5:7]); }
+    F+=h.t[r?0:1]; d1+=h.x[r?0:2]; d2+=h.x[r?1:3];
+  }
+  let above=0,tot=0; for(let b=0;b<len;b++){ tot+=A[b]; if(b>cut) above+=P[b]; }
+  const bAt=B?Math.max(0,Math.min(P[cut]||0,B-above)):0;
+  const n=[]; let N=0; for(let b=0;b<len&&b<=cut;b++){ n[b]=Math.max(0,A[b]-(b===cut?bAt:0)); N+=n[b]; }
+  const solve=t=>{ if(!(t>0)) return 0; if(t>=N) return 1; let lo=0,hi=1; for(let i=0;i<50;i++){ const m=(lo+hi)/2; let e=0; for(let b=0;b<n.length;b++) e+=n[b]*(1-Math.pow(1-m,b+1)); if(e>t) hi=m; else lo=m; } return (lo+hi)/2; };
+  const phi=N?Math.min(1,Math.max(0,F-(B-B2))/N):0;
+  let c=Math.max(solve(d1+d2),phi?solve(d1/phi):0);
+  const left=h.p-st(h,'r').sp-st(h,'n').sp>0&&!(capped&&k==='n');   // tags still unissued after this pass: every first choice drew
+  if(left) c=1;
+  return h[key]={B,cut:B?cut:null,q:B&&A[cut]?bAt/A[cut]:0,c,tot,left};
+}
 function at(h,k,b){
-  const s=st(h,k),a=h[k+'a'][b]||0,p=h[k+'p'][b]||0;
-  if(a>0) return {o:p/a,p,a};
-  if(s.top>=0&&b>s.top&&s.sure!==null) return {o:1,est:true};
-  return null;
+  const M=mdl(h,k); if(!M.tot) return null;
+  const a=h[k+'a'][b]||0,p=h[k+'p'][b]||0;
+  if(M.left) return {o:1,left:true,p,a};
+  if(M.B&&b>M.cut) return {o:1,sure:true,cut:M.cut,p,a};
+  const rnd=1-Math.pow(1-M.c,b+1);
+  return {o:M.B&&b===M.cut?M.q+(1-M.q)*rnd:rnd,p,a};
 }
 
 const S={res:'n',pts:0,sort:'n',dir:1,open:new Set()};
@@ -277,7 +309,7 @@ const COLS=[
  {k:'sa',t:'Applied',tip:'Applicants in your residency group who listed the hunt first or second, with the split underneath'},
  {k:'sp',t:'Drew',tip:'Tags your residency group drew, split by first choice and second choice'},
  {k:'odds',t:'Odds',tip:'Tags drawn ÷ first- plus second-choice applicants in your residency group'},
- {k:'mine',t:'At my pts',you:1,tip:'Odds for applicants with exactly your bonus points'},
+ {k:'mine',t:'At my pts',you:1,tip:'Modeled odds for one applicant who lists the hunt first with your bonus points'},
  {k:'sure',t:'All drew at',tip:'Lowest point level where everyone at or above it drew'},
  {k:'su',t:"'25 success",tip:'Hunter success in the matching 2025 hunt'},
  {k:'hv',t:"'25 harvest",tip:'Elk taken ÷ hunters afield in the matching 2025 hunt'}
@@ -309,9 +341,8 @@ function filtered(){
 }
 function rowHTML(h){
   const s=st(h,S.res),m=at(h,S.res,S.pts),y=h.y,open=S.open.has(h.n);
-  let mine='–';
-  if(m) mine=(m.est?'~':'')+pct(m.o)+meter(m.o)+'<span class="frac">'+(m.est?'above all applicants':m.p+' of '+m.a+' drew')+'</span>';
-  else mine='–<span class="frac">no one applied</span>';
+  let mine='–<span class="frac">no one applied</span>';
+  if(m) mine=(m.sure||m.left?'~':'')+pct(m.o)+meter(m.o)+'<span class="frac">'+(m.left?'tags were left over':m.sure?'bonus-pass cutoff '+m.cut+' pts':m.a?'actual: '+m.p+' of '+m.a:'none applied at '+S.pts+' pts')+'</span>';
   let out='<tr class="row'+(open?' open':'')+'" data-n="'+h.n+'">'+
    '<td class="l"><button type="button" class="hb" aria-expanded="'+open+'">'+h.n+'</button><span class="sub">'+WL[h.s]+'</span></td>'+
    '<td class="l"><span class="unit">'+esc(h.unit)+'</span>'+(h.sub?'<span class="sub">'+esc(h.sub)+'</span>':'')+(h.ac[1]?'<span class="acc a'+h.ac[0]+'">'+h.ac[1]+'</span>':'')+'</td>'+
@@ -336,10 +367,14 @@ function side(h,k,name){
 function detailHTML(h){
   const R=st(h,'r'),N=st(h,'n'),len=Math.max(h.ra.length,h.na.length);
   let rows='';
-  for(let b=0;b<len;b++){
-    const ra=h.ra[b]||0,rp=h.rp[b]||0,na=h.na[b]||0,np=h.np[b]||0;
-    rows+='<tr'+(b===S.pts?' class="me"':'')+'><td>'+b+'</td><td class="grp'+(ra?'':' z')+'">'+ra+'</td><td class="'+(rp?'':'z')+'">'+rp+'</td><td>'+(ra?pct(rp/ra):'')+'</td><td class="grp'+(na?'':' z')+'">'+na+'</td><td class="'+(np?'':'z')+'">'+np+'</td><td>'+(na?pct(np/na):'')+'</td></tr>';
-  }
+  const prow=b=>{
+    const ra=h.ra[b]||0,rp=h.rp[b]||0,na=h.na[b]||0,np=h.np[b]||0,mr=at(h,'r',b),mn=at(h,'n',b);
+    rows+='<tr'+(b===S.pts?' class="me"':'')+'><td>'+b+'</td><td class="grp'+(ra?'':' z')+'">'+ra+'</td><td class="'+(rp?'':'z')+'">'+rp+'</td><td>'+(ra?pct(rp/ra):'')+'</td><td class="md">'+(mr?pct(mr.o):'')+'</td><td class="grp'+(na?'':' z')+'">'+na+'</td><td class="'+(np?'':'z')+'">'+np+'</td><td>'+(na?pct(np/na):'')+'</td><td class="md">'+(mn?pct(mn.o):'')+'</td></tr>';
+  };
+  for(let b=0;b<len;b++) prow(b);
+  if(S.pts>=len) prow(S.pts);
+  const Mr=mdl(h,'r'),Mn=mdl(h,'n'),pn=M=>M.c>=1?'100%':pct(M.c);
+  const per=!Mr.tot&&!Mn.tot?'':Mr.left?' This hunt still had tags after the pass, so every first-choice applicant drew.':' Here that chance is '+(h.l==='B'?(Mr.tot?pn(Mr)+' for residents':'')+(Mr.tot&&Mn.tot?' and ':'')+(Mn.tot?pn(Mn)+' for nonresidents':''):pn(Mr)+' for everyone, because hunts without the nonresident cap put both groups in one line')+'.';
   const drawn=R.sp+N.sp,left=h.p-drawn,y=h.y;
   let prev;
   if(y){
@@ -353,8 +388,8 @@ function detailHTML(h){
      (y.od!=null?'<dt>Published odds</dt><dd>'+y.od+'% first-choice odds, all applicants (Arizona Game &amp; Fish)</dd>':'')+
      '</dl>';
   } else prev='<h3>2025 season</h3><p class="note" style="margin-top:0">No matching 2025 hunt. This hunt is new or rotated into the unit for 2026, so there is no prior-year harvest to show.</p>';
-  return '<div class="dinner"><div><h3>2026 draw by bonus points · hunt '+h.n+'</h3><div class="ptswrap"><table class="pts"><thead><tr><th>Pts</th><th class="grp">Res. applied</th><th>Drew</th><th>Odds</th><th class="grp">Nonres. applied</th><th>Drew</th><th>Odds</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
-   '<p class="note">Applied counts first- and second-choice applicants at that point level. Your point level is highlighted.</p></div>'+
+  return '<div class="dinner"><div><h3>2026 draw by bonus points · hunt '+h.n+'</h3><div class="ptswrap"><table class="pts"><thead><tr><th>Pts</th><th class="grp">Res. applied</th><th>Drew</th><th>Actual</th><th>Model</th><th class="grp">Nonres. applied</th><th>Drew</th><th>Actual</th><th>Model</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+   '<p class="note">Applied counts first- and second-choice applicants at that point level, and Actual is drew ÷ applied. Model is the estimate for one applicant who lists this hunt first: certain above the bonus-pass cutoff, otherwise 1 − (1 − p)<sup>points + 1</sup>, where p is the chance per random number.'+per+' Actual includes second-choice applicants, who draw less often, so Model usually runs higher. Your point level is highlighted.</p></div>'+
    '<div><div class="box"><h3>'+esc(h.unit)+(h.sub?' · '+esc(h.sub):'')+'</h3><dl class="facts">'+
    '<dt>Hunt</dt><dd>'+WL[h.s]+' · '+LL[h.l]+' · '+fmtD(h.o)+' – '+fmtD(h.c)+', 2026</dd>'+
    '<dt>Tags</dt><dd>'+nf(h.p)+' authorized · '+nf(drawn)+' drawn on first or second choice'+(left>0?' · <b>'+left+' left over</b> for later passes':'')+'</dd>'+

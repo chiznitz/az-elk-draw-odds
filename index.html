@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Sortable, searchable Arizona elk draw odds by hunt and bonus point level for the 2026 draw, with 2025 hunt success. Built from Arizona Game &amp; Fish public reports.">
+<meta name="description" content="Sortable, searchable Arizona elk draw odds by hunt and bonus point level for the 2026 draw, with 2025 hunt success and land-access flags. Built from Arizona Game &amp; Fish public reports.">
 <style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Arizona Elk Draw Odds</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -109,6 +109,10 @@ dl.facts dd{margin:0;font-variant-numeric:tabular-nums}
 .box{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
 .box+.box{margin-top:12px}
 .empty{padding:40px 16px;text-align:center;color:var(--ink-2)}
+.acc{display:block;width:max-content;max-width:210px;white-space:normal;margin-top:4px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:600}
+.acc.a2{background:var(--surface-2);color:var(--ink-2)}
+.acc.a3{background:var(--warm-soft);color:var(--warm)}
+.acc.a4{background:color-mix(in srgb,var(--low) 16%,transparent);color:var(--low)}
 details.how{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
 details.how summary{cursor:pointer;font-weight:600}
 details.how .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:6px 28px;margin-top:10px;color:var(--ink-2);font-size:14px}
@@ -151,6 +155,9 @@ footer ul{margin:6px 0 0;padding-left:18px}
     <div class="field"><label for="f-t">Season</label>
       <select id="f-t"><option value="">Any time</option><option value="early">Early (opens by Oct 8)</option><option value="mid">Mid (Oct 9 – Nov 5)</option><option value="late">Late (Nov 6 on)</option></select>
     </div>
+    <div class="field"><label for="f-a">Land access</label>
+      <select id="f-a"><option value="3">Public-land friendly only</option><option value="4">Hide limited-access hunts</option><option value="9">Show every hunt</option></select>
+    </div>
     <div class="field"><span class="lab">Include</span>
       <div class="checks">
         <label><input type="checkbox" id="f-lim" checked> Limited-opportunity hunts</label>
@@ -184,6 +191,7 @@ footer ul{margin:6px 0 0;padding-left:18px}
       </div>
       <div>
         <p><b>2025 success.</b> Share of hunters who took an elk in the matching 2025 hunt, from the department's hunter survey. Hunts are matched by unit, weapon, elk type and season dates, since hunt numbers change between years. Six 2026 hunts have no 2025 match.</p>
+        <p><b>Land access.</b> Game &amp; Fish does not publish land ownership with its draw or harvest reports, so the success rates here do not separate public from private ground. The access tags come from the hunt notes in the 2026 regulations. Unit 10 and Units 15A, 15B and 18A are marked Limited access, because the department warns that access there is restricted and depends on private ranches. By default the table hides those, along with limited-opportunity hunts and small named hunt areas. The Land access filter can hide only the limited-access hunts, or show everything. A hunt with no tag has no access warning in the regulations. That is not a guarantee it is all public, so check a land-ownership map before you apply.</p>
         <p><b>Not included.</b> Hopi and Camp Navajo hunts, over-the-counter nonpermit hunts, and tags issued in the third-to-fifth-choice pass.</p>
       </div>
     </div>
@@ -220,11 +228,25 @@ for(const h of DATA){
   h.unit=par||h.a.replace(/\s*\(excluding[^)]*\)/,'');
   h.sub=par?h.a+' hunt area':(ex?ex[1]:'');
   h.tm=h.o<='1008'?'early':h.o<='1105'?'mid':'late';
-  h.q=(h.n+' '+h.a+' '+(par||'')+' '+WL[h.s]+' '+LL[h.l]).toLowerCase();
+  h.ac=access(h);
+  h.q=(h.n+' '+h.a+' '+(par||'')+' '+WL[h.s]+' '+LL[h.l]+' '+h.ac[1]).toLowerCase();
   const m=/^(\d+)\s*([A-Z]*)/.exec(h.unit)||[0,999,''];
   h.uk=(+m[1])*100+(m[2]?m[2].charCodeAt(0)-64:0)+(/North/.test(h.unit)?.1:/South/.test(h.unit)?.2:/East/.test(h.unit)?.1:/West/.test(h.unit)?.2:0);
 }
 
+function access(h){
+  const a=h.a,L=h.s[0]==='L';
+  if(a==='15A, 15B, and 18A') return [4,'Limited access','Game &amp; Fish flags this hunt: hunter access is extremely restricted in at least one of these units, and applicants should secure access from the landowner before applying. Fort Rock Ranch grants access under its own rules.'];
+  if(a==='10') return [4,'Limited access','The Boquillas-Diamond A Ranch covers the western half of Unit 10, about 720,000 acres, and Game &amp; Fish says this hunt may have restricted access. The ranch sells a paid access permit for each hunt and bans ATVs, UTVs, horses, trail cameras, blinds and baiting, so check its current rules and fee before applying. Perrin Ranch on the east side needs a free ranch pass.'];
+  if(PARENT[a]&&a!=='Kachina Peaks Wilderness') return [3,'Small hunt area, check land','A small named hunt area, not a whole unit'+(L?', in what Game &amp; Fish calls a non-traditional area where elk occur in low numbers':'')+'. The regulations give its boundary but not its land ownership. Several of these sit around towns and farmland, so confirm on a land-ownership map that you can reach elk on public ground.'];
+  if(L) return [3,'Low-density area, check land','A limited-opportunity hunt. Game &amp; Fish notes that elk occur in low numbers in these non-traditional areas. Land ownership is not published with the hunt, so check a land-ownership map before applying.'];
+  if(a==='Kachina Peaks Wilderness') return [2,'Wilderness, foot access','Public land inside the Kachina Peaks Wilderness, 8,000 to 12,635 feet, with little to no vehicle access.'];
+  if(a==='9'||a==='7 East') return [2,'Free ranch pass','Part of the unit is the CO Bar Ranch, open to hunters under a Landowner Compact with a free ranch pass from the sign-in boxes.'+(a==='7 East'?' Walking Cane Ranch in the southeast has its own ranch rules, and Game &amp; Fish notes elk density is lower across 7 East.':'')];
+  if(/^5A|^5B/.test(a)) return [2,'Free ranch pass','Part of the unit is ranch land open by agreement: the Bar T Bar and Flying M ranches (free ranch pass) and the Hopi Three Canyon Ranch (written permission through Game &amp; Fish).'];
+  if(/^4A/.test(a)) return [2,'Ranch permission','Part of the unit is the Hopi Tribe\'s Aja Ranch, open to state hunters with written permission through Game &amp; Fish.'];
+  if(a==='4B') return [1,'','No access warning for the national forest. Game &amp; Fish notes that north of the Apache-Sitgreaves boundary the land is mostly private mixed with State Trust.'];
+  return [1,'','No access warning in the 2026 regulations for this hunt.'];
+}
 function st(h,k){
   if(h['_'+k]) return h['_'+k];
   const A=h[k+'a'],P=h[k+'p']; let sa=0,sp=0,top=-1,minD=null,sure=null;
@@ -272,8 +294,9 @@ function drawHead(){
 }
 function filtered(){
   const q=$('#q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const w=$('#f-w').value,l=$('#f-l').value,t=$('#f-t').value,lim=$('#f-lim').checked,sp=$('#f-sp').checked;
+  const w=$('#f-w').value,l=$('#f-l').value,t=$('#f-t').value,lim=$('#f-lim').checked,sp=$('#f-sp').checked,acc=+$('#f-a').value;
   const rows=DATA.filter(h=>{
+    if(h.ac[0]>=acc) return false;
     if(w&&WG[h.s]!==w) return false; if(l&&h.l!==l) return false; if(t&&h.tm!==t) return false;
     if(!lim&&h.s[0]==='L') return false; if(!sp&&(h.s==='Y'||h.s==='C')) return false;
     for(const x of q) if(!h.q.includes(x)) return false; return true;
@@ -289,7 +312,7 @@ function rowHTML(h){
   else mine='–<span class="frac">no one applied</span>';
   let out='<tr class="row'+(open?' open':'')+'" data-n="'+h.n+'">'+
    '<td class="l"><button type="button" class="hb" aria-expanded="'+open+'">'+h.n+'</button><span class="sub">'+WL[h.s]+'</span></td>'+
-   '<td class="l"><span class="unit">'+esc(h.unit)+'</span>'+(h.sub?'<span class="sub">'+esc(h.sub)+'</span>':'')+'</td>'+
+   '<td class="l"><span class="unit">'+esc(h.unit)+'</span>'+(h.sub?'<span class="sub">'+esc(h.sub)+'</span>':'')+(h.ac[1]?'<span class="acc a'+h.ac[0]+'">'+h.ac[1]+'</span>':'')+'</td>'+
    '<td class="l">'+fmtD(h.o)+' – '+fmtD(h.c)+'<span class="tm">'+h.tm+'</span></td>'+
    '<td class="l"><span class="chip '+h.l+'">'+LL[h.l]+'</span></td>'+
    '<td class="num">'+nf(h.p)+'</td>'+
@@ -333,7 +356,7 @@ function detailHTML(h){
    '<div><div class="box"><h3>'+esc(h.unit)+(h.sub?' · '+esc(h.sub):'')+'</h3><dl class="facts">'+
    '<dt>Hunt</dt><dd>'+WL[h.s]+' · '+LL[h.l]+' · '+fmtD(h.o)+' – '+fmtD(h.c)+', 2026</dd>'+
    '<dt>Tags</dt><dd>'+nf(h.p)+' authorized · '+nf(drawn)+' drawn on first or second choice'+(left>0?' · <b>'+left+' left over</b> for later passes':'')+'</dd>'+
-   side(h,'r','Residents')+side(h,'n','Nonresidents')+
+   '<dt>Land access</dt><dd>'+(h.ac[1]?'<b>'+h.ac[1]+'.</b> ':'')+h.ac[2]+'</dd>'+side(h,'r','Residents')+side(h,'n','Nonresidents')+
    '<dt>Nonres. share</dt><dd>'+(drawn?pct(N.sp/drawn):'–')+' of tags drawn</dd></dl></div>'+
    '<div class="box">'+prev+'</div></div></div>';
 }
@@ -357,8 +380,8 @@ $('#pts').addEventListener('input',e=>setPts(e.target.value,true));
 $('#pts').addEventListener('blur',e=>{ e.target.value=S.pts; });
 $('#pts-dn').addEventListener('click',()=>setPts(S.pts-1));
 $('#pts-up').addEventListener('click',()=>setPts(S.pts+1));
-for(const id of ['#q','#f-w','#f-l','#f-t','#f-lim','#f-sp']) $(id).addEventListener('input',render);
-function reset(){ $('#q').value=''; $('#f-w').value=''; $('#f-l').value=''; $('#f-t').value=''; $('#f-lim').checked=true; $('#f-sp').checked=false; S.sort='n'; S.dir=1; S.open.clear(); render(); }
+for(const id of ['#q','#f-w','#f-l','#f-t','#f-a','#f-lim','#f-sp']) $(id).addEventListener('input',render);
+function reset(){ $('#q').value=''; $('#f-w').value=''; $('#f-l').value=''; $('#f-t').value=''; $('#f-a').value='3'; $('#f-lim').checked=true; $('#f-sp').checked=false; S.sort='n'; S.dir=1; S.open.clear(); render(); }
 $('#reset').addEventListener('click',reset); $('#reset2').addEventListener('click',reset);
 
 (function(){ let bt=0,bn=0; for(const h of DATA){ if(h.l!=='B') continue; bt+=st(h,'r').sp+st(h,'n').sp; bn+=st(h,'n').sp; } if(bt) $('#nrline').textContent='In the 2026 draw they ended up with '+(bn/bt*100).toFixed(1)+'% of all bull tags.'; })();
